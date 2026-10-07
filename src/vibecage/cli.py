@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import shutil
 import sys
 import subprocess
 import signal
@@ -32,7 +33,7 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-def parse_config(configfile: Path) -> dict:
+def parse_config(configfile: Path, no_error: bool) -> dict:
     config = {
         "network": {
         },
@@ -49,6 +50,11 @@ def parse_config(configfile: Path) -> dict:
         }
     }
 
+    if not configfile.exists():
+        if no_error:
+            return config
+        raise ValueError(f'Config file {configfile} does not exists')
+
     with open(configfile, "rb") as f:
         user_data = tomllib.load(f)
         
@@ -62,10 +68,11 @@ def parse_config(configfile: Path) -> dict:
 def parse_cli_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-w", "--workdir", default='workspace', type=Path, required=True)
+    parser.add_argument("-w", "--workdir", default='workspace', type=Path )
     parser.add_argument("-c", "--config", type=Path)
 
     parser.add_argument("-b", "--bootstrap", action='store_true')
+    parser.add_argument("-i", "--init", action='store_true')
 
     parser.add_argument("--allow-net", action='store_true')
     parser.add_argument("-s", "--shell", action='store_true')
@@ -78,10 +85,8 @@ def parse_cli_args():
 
     if not args.config:
         args.config = args.workdir.parent / f'{args.workdir.name}.toml'
-    if not args.config.exists():
-        raise ValueError(f'Config file {args.config} does not exists')
 
-    config = parse_config(args.config)
+    config = parse_config(args.config, no_error=args.init)
 
     if args.allow_net:
         config['firewall']['enable'] = False
@@ -105,10 +110,23 @@ def build_image(dockerfile: str, name: str):
 def main():
     config, args, jail_args = parse_cli_args()
 
-    pprint(config)
-
     workdir = Path(args.workdir).absolute()
     name = workdir.name
+
+    if args.init:
+        root = Path(__file__).parents[2]
+        if root == Path.cwd():
+            raise ValueError("Already in project root")
+
+        exts = ['Dockerfile', 'toml', 'sh']
+        for ext in exts:
+            tgt = f'{name}.{ext}'
+            print('Creating', tgt)
+            shutil.copy(root / f'workspace.{ext}', tgt)
+
+        sys.exit(0)
+
+    pprint(config)
 
     volumes = [
         f"{workdir}:/{name}:Z",
