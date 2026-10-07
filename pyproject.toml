@@ -1,0 +1,12 @@
+[project]
+name = "vibecage"
+version = "0.0.1"
+authors = [
+	{name = "Ruslan Kuchumov", email = "kuchumovri@gmail.com"},
+]
+dependencies= [
+	"pytest"
+]
+
+[project.scripts]
+vibecage = "vibecage.cli:main"

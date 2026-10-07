@@ -1,0 +1,25 @@
+[firewall]
+enable = true
+
+whitelist = [
+    "api.github.com",
+    "raw.githubusercontent.com",
+    "*.opencode.ai",
+    "opencode.ai",
+    "pypi.org",
+    "pythonhosted.org",
+    "*.pythonhosted.org",
+	"registry.npmjs.org",
+]
+
+[jail]
+ports = [ "4096:4096" ]
+
+allow_gpu = true
+
+extra_volumes = [
+	"/home/rk/.config/opencode:/home/rk/.config/opencode,Z",
+]
+
+entrypoint = "/usr/local/bin/opencode"
+# entrypoint = "/bin/bash"
