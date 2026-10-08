@@ -54,6 +54,8 @@ class PodmanJail(Podman):
         if self._entrypoint:
             cmd += ["--entrypoint", self._entrypoint]
 
+        # cmd += ['--log-level=debug']
+
         cmd += [self._image] + command
 
         return cmd

@@ -82,8 +82,12 @@ class Podman(abc.ABC):
             pass
 
     def tail_logs(self):
+        cmd = ["podman", "logs", "--since=0s", "-f", self.name]
+        print(f'Starting log tail for {self.name}')
+        pretty_print_cmd(cmd)
+
         proc = subprocess.Popen(
-            ["podman", "logs", "-f", self.name],
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

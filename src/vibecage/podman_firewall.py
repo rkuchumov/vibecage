@@ -10,7 +10,6 @@ import fnmatch
 from .podman import Podman
 
 class PodmanFirewall(Podman):
-
     WAIT_DEALAY_SEC = 1
 
     def __init__(
@@ -73,6 +72,8 @@ class PodmanFirewall(Podman):
             "--cap-add=NET_ADMIN",
             "--cap-add=NET_RAW",
             "--dns=127.0.0.1",
+            "--userns=keep-id",
+            "--user=root",
             "-v", f"{whitelist}:/whitelist.txt:ro,Z"
         ]
 
@@ -90,12 +91,12 @@ class PodmanFirewall(Podman):
         return cmd
 
     def _handle_breach(self, target: str):
-        print(f"\nAccess to {target} is not allowed")
+        print(f"\nAccess to {target} is not allowed", flush=True)
 
         if not self._kill_target:
             return
 
-        print(f"Killing container {self._kill_target}")
+        print(f"Killing container {self._kill_target}", flush=True)
         subprocess.run(["podman", "kill", self._kill_target])
 
     def _address_is_allowed(self, addr: str) -> bool:

@@ -74,7 +74,7 @@ def parse_cli_args():
         config["jail"]["entrypoint"] = "/bin/bash"
 
     if not config['jail']['image']:
-        config['jail']['image'] = f'vibecage-{args.workdir.name}'
+        config['jail']['image'] = f'vc-{args.workdir.name}-main'
 
     if args.port:
         config['jail']['port'] = args.port
@@ -111,7 +111,7 @@ def main():
     if args.bootstrap:
         df = args.workdir.parent / f'{name}.Dockerfile'
         if df.exists():
-            Podman.build(df, f'vc-{name}-main')
+            Podman.build(df, config['jail']['image'])
 
         wd = Path(args.workdir)
         wd.mkdir(exist_ok=True)
