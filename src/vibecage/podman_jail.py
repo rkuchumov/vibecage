@@ -1,11 +1,9 @@
-import subprocess
-from .utils import pretty_print_cmd
+from .podman import Podman
 
-class PodmanJail():
-    NAME = 'vibecage-main'
-
+class PodmanJail(Podman):
     def __init__(
         self,
+        workspace: str,
         image: str,
         volumes: list[str] = [],
         ports: list[str] = [],
@@ -14,6 +12,8 @@ class PodmanJail():
         entrypoint: str | None = None,
         allow_gpu: bool = False,
     ):
+        super().__init__(f'vc-{workspace}-main')
+
         self._image = image
         self._allow_gpu = allow_gpu
         self._net_container = network_container
@@ -22,14 +22,10 @@ class PodmanJail():
         self._workdir = workdir
         self._entrypoint = entrypoint
 
-    @property
-    def name(self):
-        return self.NAME
-
-    def start(self, command: list[str] = []):
+    def _make_command(self, command: list[str] = []):
         cmd = [
             "podman", "run", "--rm", "-it",
-            "--name", self.NAME,
+            "--name", self.name,
             "--cap-drop=ALL",
             "--security-opt=no-new-privileges",
             "--userns=keep-id",
@@ -60,10 +56,11 @@ class PodmanJail():
 
         cmd += [self._image] + command
 
-        print('Starting Container')
-        pretty_print_cmd(cmd)
+        return cmd
 
-        try:
-            subprocess.run(cmd)
-        except KeyboardInterrupt:
-            pass
+    def start(self, args: list[str] = []):
+        cmd = self._make_command(args)
+        self.start_container(cmd)
+
+    def stop(self):
+        pass

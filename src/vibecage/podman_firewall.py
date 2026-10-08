@@ -7,18 +7,20 @@ import re
 from pathlib import Path
 import fnmatch
 
-from .utils import pretty_print_cmd
+from .podman import Podman
 
-class PodmanFirewall():
-    NAME = 'vibecage-firewall'
+class PodmanFirewall(Podman):
 
     WAIT_DEALAY_SEC = 1
 
     def __init__(
         self,
+        workspace: str,
         whitelist: list[str],
         ports: list[str],
     ):
+        super().__init__(f'vc-{workspace}-firewall')
+
         self._ports = ports
         self._kill_target = None
 
@@ -30,9 +32,7 @@ class PodmanFirewall():
         self._re_dns = re.compile(r'query\[[a-zA-Z0-9]+\]\s+([^\s]+)\s+from')
         self._re_ip = re.compile(r'>\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
 
-    @property
-    def name(self):
-        return self.NAME
+        self._log_proc = None
 
     def set_target(self, tgt: str):
         self._kill_target = tgt
@@ -64,7 +64,7 @@ class PodmanFirewall():
 
         return p
 
-    def _start_container(self):
+    def _make_command(self):
         whitelist = self._make_domains_whitelist()
 
         cmd = [
@@ -87,17 +87,7 @@ class PodmanFirewall():
             "sh", "-c", "./firewall.sh"
         ]
 
-        print('Starting Firewall')
-        pretty_print_cmd(cmd)
-
-        proc = subprocess.run(
-            cmd,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            # stderr=subprocess.DEVNULL
-        )
-
-        return proc
+        return cmd
 
     def _handle_breach(self, target: str):
         print(f"\nAccess to {target} is not allowed")
@@ -119,15 +109,9 @@ class PodmanFirewall():
         return False
 
     def _monitor_thread(self):
-        proc = subprocess.Popen(
-            ["podman", "logs", "-f", self.name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1
-        )
+        self._log_proc = self.tail_logs()
 
-        for line in proc.stdout:
+        for line in self._log_proc.stdout:
             ip = self._extract_ip(line)
             if ip and not self._address_is_allowed(ip):
                 self._handle_breach(ip)
@@ -138,8 +122,10 @@ class PodmanFirewall():
                 self._handle_breach(domain)
                 break
 
-    def start(self):
-        self._podman_proc = self._start_container()
+    def start(self, args: list[str] = []):
+        cmd = self._make_command()
+
+        self.start_container(cmd, no_stdout=True)
     
         time.sleep(PodmanFirewall.WAIT_DEALAY_SEC)
 
@@ -149,5 +135,10 @@ class PodmanFirewall():
         )
 
         mon_thread.start()
+
+    def stop(self):
+        if self._log_proc is not None:
+            self._log_proc.terminate()
+            self._log_proc.wait()
 
 

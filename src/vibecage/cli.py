@@ -2,9 +2,6 @@
 
 import shutil
 import sys
-import subprocess
-import signal
-import atexit
 import argparse
 import tomllib
 from pathlib import Path
@@ -12,26 +9,7 @@ from pprint import pprint
 
 from .podman_firewall import PodmanFirewall
 from .podman_jail import PodmanJail
-
-def podman_remove_containers():
-    subprocess.run(
-        ["podman", "rm", "-f", PodmanFirewall.NAME, PodmanFirewall.NAME], 
-        stdout=subprocess.DEVNULL, 
-        stderr=subprocess.DEVNULL
-    )
-
-def cleanup():
-    print("\nDeleting containers...")
-    podman_remove_containers()
-
-atexit.register(cleanup)
-
-def signal_handler(sig, frame):
-    print('Got signal', sig)
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
+from .podman import Podman
 
 def parse_config(configfile: Path, no_error: bool) -> dict:
     config = {
@@ -68,11 +46,12 @@ def parse_config(configfile: Path, no_error: bool) -> dict:
 def parse_cli_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-w", "--workdir", default='workspace', type=Path )
+    parser.add_argument("-w", "--workdir", default='workspace', type=Path)
     parser.add_argument("-c", "--config", type=Path)
 
     parser.add_argument("-b", "--bootstrap", action='store_true')
     parser.add_argument("-i", "--init", action='store_true')
+    parser.add_argument("-p", "--port")
 
     parser.add_argument("--allow-net", action='store_true')
     parser.add_argument("-s", "--shell", action='store_true')
@@ -97,15 +76,10 @@ def parse_cli_args():
     if not config['jail']['image']:
         config['jail']['image'] = f'vibecage-{args.workdir.name}'
 
-    return config, args, args_unknown
+    if args.port:
+        config['jail']['port'] = args.port
 
-def build_image(dockerfile: str, name: str):
-    subprocess.run([
-        "podman",
-        "build",
-        "-t", name,
-        "-f", dockerfile
-    ])
+    return config, args, args_unknown
 
 def main():
     config, args, jail_args = parse_cli_args()
@@ -128,6 +102,8 @@ def main():
 
     pprint(config)
 
+    Podman.setup_signals()
+
     volumes = [
         f"{workdir}:/{name}:Z",
     ]
@@ -135,7 +111,7 @@ def main():
     if args.bootstrap:
         df = args.workdir.parent / f'{name}.Dockerfile'
         if df.exists():
-            build_image(df, f'vibecage-{name}')
+            Podman.build(df, f'vc-{name}-main')
 
         wd = Path(args.workdir)
         wd.mkdir(exist_ok=True)
@@ -147,6 +123,7 @@ def main():
 
     if config['firewall']['enable']:
         firewall = PodmanFirewall(
+            workspace = name,
             whitelist = config['firewall']['whitelist'],
             ports = config['jail']['ports'],
         )
@@ -162,6 +139,7 @@ def main():
         }
 
     jail = PodmanJail(
+        workspace = name,
         image = config['jail']['image'],
         volumes = volumes,
         allow_gpu = config['jail']['allow_gpu'],
