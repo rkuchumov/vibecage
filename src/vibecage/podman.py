@@ -3,6 +3,7 @@ import signal
 import subprocess
 import atexit
 import abc
+from pathlib import Path
 from .utils import pretty_print_cmd
 
 class Podman(abc.ABC):
@@ -45,13 +46,14 @@ class Podman(abc.ABC):
         signal.signal(signal.SIGTERM, Podman.on_signal)
 
     @staticmethod
-    def build(dockerfile: str, name: str):
-        subprocess.run([
-            "podman",
-            "build",
-            "-t", name,
-            "-f", dockerfile
-        ])
+    def build(
+        name: str,
+        dockerfile: Path | None = None,
+    ):
+        cmd = ["podman", "build", "-t", name]
+        if dockerfile:
+            cmd +=  ['-f', str(dockerfile)]
+        subprocess.run(cmd)
     
     def start_container(
         self,
@@ -78,6 +80,11 @@ class Podman(abc.ABC):
             Podman.ACTIVE.append(self)
 
             return proc
+        except subprocess.CalledProcessError as e:
+            if e.returncode == 137:
+                print("\nContainer was terminated.")
+            else:
+                raise e
         except KeyboardInterrupt:
             pass
 

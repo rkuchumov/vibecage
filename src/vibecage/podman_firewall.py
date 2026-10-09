@@ -17,11 +17,13 @@ class PodmanFirewall(Podman):
         workspace: str,
         whitelist: list[str],
         ports: list[str],
+        logfile: str | Path | None = None,
     ):
         super().__init__(f'vc-{workspace}-firewall')
 
         self._ports = ports
         self._kill_target = None
+        self._logfile = logfile
 
         self._whitelist = set()
         for item in whitelist:
@@ -69,6 +71,7 @@ class PodmanFirewall(Podman):
         cmd = [
             "podman", "run", "-d", "--rm",
             "--name", self.name,
+            "--init",
             "--cap-add=NET_ADMIN",
             "--cap-add=NET_RAW",
             "--dns=127.0.0.1",
@@ -82,6 +85,7 @@ class PodmanFirewall(Podman):
 
         fw_sciprt = Path(__file__).parent / 'firewall.sh'
         cmd += ['-v', f"{str(fw_sciprt)}:/firewall.sh:ro,Z,exec"]
+        # cmd += ['--log-level=debug']
 
         cmd += [
             "alpine:latest",
@@ -90,8 +94,17 @@ class PodmanFirewall(Podman):
 
         return cmd
 
+    def _log_access(self, target: str):
+        if not self._logfile:
+            return
+
+        with open(self._logfile, 'a') as f:
+            f.write(target + '\n')
+
     def _handle_breach(self, target: str):
-        print(f"\nAccess to {target} is not allowed", flush=True)
+        print(f"\n\nAccess to {target} is not allowed\n\n", flush=True)
+
+        self._log_access(target)
 
         if not self._kill_target:
             return

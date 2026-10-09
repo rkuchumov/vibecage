@@ -63,7 +63,7 @@ def parse_cli_args():
         args.shell = True
 
     if not args.config:
-        args.config = args.workdir.parent / f'{args.workdir.name}.toml'
+        args.config = args.workdir / 'config.toml'
 
     config = parse_config(args.config, no_error=args.init)
 
@@ -88,15 +88,17 @@ def main():
     name = workdir.name
 
     if args.init:
+        Path(f'{name}/mount').mkdir(exist_ok=True, parents=True)
+
         root = Path(__file__).parents[2]
         if root == Path.cwd():
             raise ValueError("Already in project root")
 
-        exts = ['Dockerfile', 'toml', 'sh']
-        for ext in exts:
-            tgt = f'{name}.{ext}'
+        files = ['Dockerfile', 'config.toml', 'bootstrap.sh']
+        for file in files:
+            tgt = f'{name}/{file}'
             print('Creating', tgt)
-            shutil.copy(root / f'workspace.{ext}', tgt)
+            shutil.copy(root / 'workspace' / file, tgt)
 
         sys.exit(0)
 
@@ -105,18 +107,15 @@ def main():
     Podman.setup_signals()
 
     volumes = [
-        f"{workdir}:/{name}:Z",
+        f"{workdir}/mount/:/{name}:Z",
     ]
 
     if args.bootstrap:
-        df = args.workdir.parent / f'{name}.Dockerfile'
+        df = workdir.parent / name / 'Dockerfile'
         if df.exists():
-            Podman.build(df, config['jail']['image'])
+            Podman.build(config['jail']['image'], df)
 
-        wd = Path(args.workdir)
-        wd.mkdir(exist_ok=True)
-
-        bs = args.workdir.parent.absolute() / f'{name}.sh'
+        bs = workdir / 'bootstrap.sh'
         volumes.append(f'{str(bs)}:/{name}/bootstrap.sh:ro,Z,exec')
 
     volumes += config['jail']['extra_volumes']
@@ -126,6 +125,7 @@ def main():
             workspace = name,
             whitelist = config['firewall']['whitelist'],
             ports = config['jail']['ports'],
+            logfile = args.workdir / 'blocked.txt',
         )
 
         jail_kw = {
