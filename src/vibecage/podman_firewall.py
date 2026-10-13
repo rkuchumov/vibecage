@@ -5,6 +5,7 @@ import tempfile
 import threading
 import re
 from pathlib import Path
+from datetime import datetime
 import fnmatch
 
 from .podman import Podman
@@ -14,12 +15,12 @@ class PodmanFirewall(Podman):
 
     def __init__(
         self,
-        workspace: str,
+        name: str,
         whitelist: list[str],
         ports: list[str],
         logfile: str | Path | None = None,
     ):
-        super().__init__(f'vc-{workspace}-firewall')
+        super().__init__(name)
 
         self._ports = ports
         self._kill_target = None
@@ -99,7 +100,7 @@ class PodmanFirewall(Podman):
             return
 
         with open(self._logfile, 'a') as f:
-            f.write(target + '\n')
+            f.write(f'{datetime.now()} {target}\n')
 
     def _handle_breach(self, target: str):
         print(f"\n\nAccess to {target} is not allowed\n\n", flush=True)

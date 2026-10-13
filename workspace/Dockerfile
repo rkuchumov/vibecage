@@ -17,6 +17,10 @@ RUN apt-get update && apt-get install -y \
 
 RUN npm install -g opencode-ai
 
+ARG USER_NAME
+
+RUN usermod -l ${USER_NAME} -m -d /home/${USER_NAME} ubuntu && groupmod -n ${USER_NAME} ubuntu
+
 WORKDIR /workspace
 
 ENTRYPOINT ["/bin/bash"]

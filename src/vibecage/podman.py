@@ -49,10 +49,16 @@ class Podman(abc.ABC):
     def build(
         name: str,
         dockerfile: Path | None = None,
+        build_args: dict[str, str] = {}
     ):
         cmd = ["podman", "build", "-t", name]
         if dockerfile:
             cmd +=  ['-f', str(dockerfile)]
+
+        for k, v in build_args.items():
+            cmd += ['--build-args', f'{k}={v}']
+
+        pretty_print_cmd(cmd)
         subprocess.run(cmd)
     
     def start_container(
@@ -102,6 +108,12 @@ class Podman(abc.ABC):
         )
 
         return proc
+
+    @staticmethod
+    def exec(name: str, args: list[str]):
+        cmd = ["podman", "exec", "-i", "-t", name] + args
+        pretty_print_cmd(cmd)
+        subprocess.run(cmd)
 
     @abc.abstractmethod
     def start(self, args: list[str] = []):

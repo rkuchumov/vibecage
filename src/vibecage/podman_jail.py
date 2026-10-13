@@ -1,23 +1,27 @@
 from .podman import Podman
+from pathlib import Path
+import os
 
 class PodmanJail(Podman):
     def __init__(
         self,
-        workspace: str,
+        name: str,
         image: str,
         volumes: list[str] = [],
         ports: list[str] = [],
-        workdir: str | None = None,
+        envs: dict[str, str] = {},
+        workdir: str | Path | None = None,
         network_container: str | None = None,
         entrypoint: str | None = None,
         allow_gpu: bool = False,
     ):
-        super().__init__(f'vc-{workspace}-main')
+        super().__init__(name)
 
         self._image = image
         self._allow_gpu = allow_gpu
         self._net_container = network_container
         self._ports = ports
+        self._envs = envs
         self._volumes = volumes
         self._workdir = workdir
         self._entrypoint = entrypoint
@@ -34,13 +38,16 @@ class PodmanJail(Podman):
         ]
 
         if self._workdir:
-            cmd += ["--workdir", self._workdir]
+            cmd += ["--workdir", str(self._workdir)]
 
         for p in self._ports:
             cmd += ['-p', p]
 
         for v in self._volumes:
             cmd += ['-v', v]
+
+        for n, e in self._envs.items():
+            cmd += ['-e', f'{n}={e}']
 
         if self._net_container:
             cmd += [f"--network=container:{self._net_container}"]
